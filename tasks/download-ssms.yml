@@ -1,0 +1,34 @@
+- name: Get SSMS EXE if needed
+  run_once: true
+  block:
+    - name: Create /opt/ludus/resources/windows directory if it doesn't exist
+      ansible.builtin.file:
+        path: "{{ ludus_install_directory }}/resources/windows"
+        state: directory
+        recurse: true
+      delegate_to: localhost
+
+    - name: Check if SSMS EXE exists
+      ansible.builtin.stat:
+        path: "{{ ludus_install_directory }}/resources/windows/SSMS-Setup-ENU.exe"
+      delegate_to: localhost
+      register: ssms_exe_check
+
+    - name: Downloading SSMS EXE
+      ansible.builtin.get_url:
+        url: "{{ ludus_mssql_ssms_url }}"
+        dest: "{{ ludus_install_directory }}/resources/windows/SSMS-Setup-ENU.exe"
+        mode: "660"
+      delegate_to: localhost
+      when: not ssms_exe_check.stat.exists
+
+- name: Check if SSMS EXE exists on host
+  ansible.windows.win_stat:
+    path: "{{ ludus_install_directory }}/resources/windows/SSMS-Setup-ENU.exe"
+  register: ssms_host_check
+
+- name: Copy SSMS EXE to windows host
+  ansible.windows.win_copy:
+    src: "{{ ludus_install_directory }}/resources/windows/SSMS-Setup-ENU.exe"
+    dest: "{{ ludus_mssql_iso_directory }}\\SSMS-Setup-ENU.exe"
+  when: not ssms_host_check.stat.exists

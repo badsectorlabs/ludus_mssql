@@ -1,0 +1,33 @@
+---
+- name: Download MSSQL ISO
+  ansible.builtin.include_tasks:
+    file: download-mssql.yml
+
+- name: Mount MSSQL ISO
+  community.windows.win_disk_image:
+    image_path: "{{ ludus_mssql_iso_directory }}\\{{ ludus_mssql_iso_url.split('/') | last }}"
+    state: present
+  register: iso_mount
+
+- name: Copy config file
+  ansible.windows.win_template:
+    src: "sqlsrv_{{ ludus_mssql_version }}_config.ini.j2"
+    dest: "{{ ludus_mssql_sql_config_path }}"
+
+- name: Install MSSQL SQL - This will take a while
+  ansible.windows.win_shell: "{{ iso_mount.mount_paths[0] }}setup.exe /ConfigurationFile={{ ludus_mssql_sql_config_path }}"
+
+- name: Unmount ISO
+  community.windows.win_disk_image:
+    image_path: "{{ ludus_mssql_iso_directory }}\\{{ ludus_mssql_iso_url.split('/') | last }}"
+    state: absent
+
+- name: Remove config file
+  ansible.windows.win_file:
+    path: "{{ ludus_mssql_sql_config_path }}"
+    state: absent
+
+- name: Remove ISO file
+  ansible.windows.win_file:
+    path: "{{ ludus_mssql_iso_directory }}\\{{ ludus_mssql_iso_url.split('/') | last }}"
+    state: absent

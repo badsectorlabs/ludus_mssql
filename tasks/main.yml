@@ -1,0 +1,22 @@
+---
+- name: Check for existing install
+  ansible.windows.win_reg_stat:
+    path: 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server'
+    name: InstalledInstances
+  register: install_check
+
+- name: Install MSSQL
+  ansible.builtin.include_tasks:
+    file: install-mssql.yml
+  when: ludus_mssql_instance_name not in install_check.value
+
+- name: Check if SSMS is already installed
+  ansible.windows.win_reg_stat:
+    path: 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\160\Tools\ClientSetup'
+  register: ssms_install
+  when: ludus_mssql_install_ssms
+
+- name: Install SSMS
+  ansible.builtin.include_tasks:
+    file: install-ssms.yml
+  when: ludus_mssql_install_ssms and not ssms_install.exists

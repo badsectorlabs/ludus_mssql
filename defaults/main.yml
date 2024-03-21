@@ -1,0 +1,11 @@
+---
+ludus_install_directory: /opt/ludus
+ludus_mssql_iso_directory: "C:\\ludus"
+ludus_mssql_version: "2019"
+ludus_mssql_sql_config_path: "{{ ludus_mssql_iso_directory }}\\sqlsrv_{{ ludus_mssql_version }}_config.ini"
+ludus_mssql_iso_url: https://archive.org/download/en_sql_server_2019_standard_x64_dvd_814b57aa_202211/en_sql_server_2019_standard_x64_dvd_814b57aa.iso
+ludus_mssql_iso_checksum: "sha256:1e56705b3544e77039584b3b38461df0321834822776aef8e50847fdd9edad44"
+ludus_mssql_instance_name: MSSQLSERVER
+ludus_mssql_sql_license_key:
+ludus_mssql_ssms_url: "https://aka.ms/ssmsfullsetup"
+ludus_mssql_install_ssms: true

@@ -1,0 +1,17 @@
+---
+- name: Download SSMS EXE
+  ansible.builtin.include_tasks:
+    file: download-ssms.yml
+
+- name: Install SSMS - This will take a while
+  ansible.windows.win_shell: "{{ ludus_mssql_iso_directory }}\\SSMS-Setup-ENU.exe /install /passive /norestart"
+  register: ssms
+
+- name: Remove SSMS EXE file
+  ansible.windows.win_file:
+    path: "{{ ludus_mssql_iso_directory }}\\SSMS-Setup-ENU.exe"
+    state: absent
+
+- name: Reboot after install
+  ansible.windows.win_reboot:
+  when: ssms.changed # noqa: no-handler - we want to reboot after removing the EXE
