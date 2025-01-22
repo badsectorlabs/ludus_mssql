@@ -8,7 +8,7 @@
 - name: Install MSSQL
   ansible.builtin.include_tasks:
     file: install-mssql.yml
-  when: ludus_mssql_instance_name not in install_check.value
+  when: (not install_check.exists) or (install_check.exists and ludus_mssql_instance_name not in install_check.value)
 
 - name: Check if SSMS is already installed
   ansible.windows.win_reg_stat:
