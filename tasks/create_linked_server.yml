@@ -1,0 +1,14 @@
+---
+- name: "Create linked server"
+  ansible.windows.win_shell: >-
+    sqlcmd -S localhost -E -Q
+    "IF EXISTS (SELECT 1 FROM sys.servers WHERE name = N'{{ item.name }}' AND is_linked = 1)
+    EXEC sp_dropserver '{{ item.name }}', 'droplogins';
+    EXEC master.dbo.sp_addlinkedserver @server = N'{{ item.name }}', @srvproduct = N'', @provider = N'{{ item.provider | default('MSOLEDBSQL') }}', @datasrc = N'{{ item.data_source }}';
+    EXEC master.dbo.sp_addlinkedsrvlogin @rmtsrvname = N'{{ item.name }}', @useself = 'False', @locallogin = NULL, @rmtuser = N'{{ item.remote_user }}', @rmtpassword = N'{{ item.remote_password }}';
+    EXEC master.dbo.sp_serveroption @server = N'{{ item.name }}', @optname = 'rpc out', @optvalue = 'true';
+    EXEC master.dbo.sp_serveroption @server = N'{{ item.name }}', @optname = 'data access', @optvalue = 'true';
+    SELECT name, data_source, provider FROM sys.servers WHERE is_linked = 1;"
+  loop: "{{ ludus_mssql_linked_servers }}"
+  when: ludus_mssql_linked_servers | length > 0
+  no_log: false

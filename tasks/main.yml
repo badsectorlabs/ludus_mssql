@@ -10,6 +10,34 @@
     file: install-mssql.yml
   when: (not install_check.exists) or (install_check.exists and ludus_mssql_instance_name not in install_check.value)
 
+- name: Enable mixed mode authentication
+  ansible.builtin.include_tasks: enable_mixed_mode.yml
+  when: ludus_mssql_mixed_mode_auth | default(false) | bool
+
+- name: Create SQL users
+  ansible.builtin.include_tasks: create_sql_users.yml
+  when: ludus_mssql_sql_users | default([]) | length > 0
+
+- name: Create AD logins
+  ansible.builtin.include_tasks: create_ad_logins.yml
+  when: ludus_mssql_ad_logins | default([]) | length > 0
+
+- name: Configure impersonations
+  ansible.builtin.include_tasks: enable_impersonation.yml
+  when: ludus_mssql_impersonations | default([]) | length > 0
+
+- name: Enable TCP and firewall for MSSQL
+  ansible.builtin.include_tasks: enable_tcp.yml
+  when: ludus_mssql_enable_tcp | default(true) | bool
+
+- name: Configure linked servers
+  ansible.builtin.include_tasks: create_linked_server.yml
+  when: ludus_mssql_linked_servers | default([]) | length > 0
+
+- name: Enable xp_cmdshell
+  ansible.builtin.include_tasks: enable_xp_cmdshell.yml
+  when: ludus_mssql_enable_xp_cmdshell | default(false) | bool
+
 - name: Check if SSMS is already installed
   ansible.windows.win_reg_stat:
     path: 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\160\Tools\ClientSetup'

@@ -1,0 +1,36 @@
+---
+- name: Enable SQL Server TCP protocol via registry
+  ansible.windows.win_regedit:
+    path: 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL{{ ludus_mssql_version_map[ludus_mssql_version] }}.MSSQLSERVER\MSSQLServer\SuperSocketNetLib\Tcp'
+    name: Enabled
+    data: 1
+    type: dword
+
+- name: Enable TCP for all IPs via registry
+  ansible.windows.win_regedit:
+    path: 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL{{ ludus_mssql_version_map[ludus_mssql_version] }}.MSSQLSERVER\MSSQLServer\SuperSocketNetLib\Tcp\IPAll'
+    name: TcpPort
+    data: "1433"
+    type: string
+
+- name: Clear dynamic ports for IPAll
+  ansible.windows.win_regedit:
+    path: 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL{{ ludus_mssql_version_map[ludus_mssql_version] }}.MSSQLSERVER\MSSQLServer\SuperSocketNetLib\Tcp\IPAll'
+    name: TcpDynamicPorts
+    data: ""
+    type: string
+
+- name: Open Windows Firewall for MSSQL TCP 1433
+  community.windows.win_firewall_rule:
+    name: "MSSQL TCP 1433"
+    localport: 1433
+    action: allow
+    direction: in
+    protocol: tcp
+    state: present
+    enabled: true
+
+- name: Restart SQL Server service to apply TCP changes
+  ansible.windows.win_service:
+    name: MSSQLSERVER
+    state: restarteds

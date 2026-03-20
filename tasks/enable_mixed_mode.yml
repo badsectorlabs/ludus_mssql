@@ -1,0 +1,12 @@
+---
+- name: Enable SQL Server mixed mode authentication
+  ansible.windows.win_regedit:
+    path: 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL{{ ludus_mssql_version_map[ludus_mssql_version] }}.{{ ludus_mssql_instance_name }}\MSSQLServer'
+    name: LoginMode
+    data: 2
+    type: dword
+
+- name: Restart SQL Server service to apply mixed mode auth
+  ansible.windows.win_service:
+    name: "{{ ludus_mssql_instance_name }}"
+    state: restarted

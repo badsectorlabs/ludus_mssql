@@ -9,3 +9,15 @@ ludus_mssql_instance_name: MSSQLSERVER
 ludus_mssql_sql_license_key:
 ludus_mssql_ssms_url: "https://aka.ms/ssmsfullsetup"
 ludus_mssql_install_ssms: true
+ludus_mssql_enable_tcp: false
+ludus_mssql_mixed_mode_auth: true
+ludus_mssql_linked_servers: []
+ludus_mssql_sql_users: []
+ludus_mssql_ad_logins: []
+ludus_mssql_impersonations: []
+ludus_mssql_enable_xp_cmdshell: false
+ludus_mssql_version_map:
+  "2019": "15"
+  "2022": "16"
+  "2017": "14"
+  "2016": "13"
