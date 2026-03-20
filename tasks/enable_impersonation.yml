@@ -1,0 +1,26 @@
+---
+- name: "Write impersonation grant script"
+  ansible.windows.win_copy:
+    content: |
+      IF EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'{{ item.grantor }}')
+        AND EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'{{ item.grantee }}')
+      BEGIN
+        GRANT IMPERSONATE ON LOGIN::[{{ item.grantor }}] TO [{{ item.grantee }}];
+      END
+    dest: "C:\\Windows\\Temp\\impersonate_{{ item.grantor }}_{{ item.grantee }}.sql"
+  loop: "{{ ludus_mssql_impersonations }}"
+  when: ludus_mssql_impersonations | length > 0
+  no_log: false
+
+- name: "Execute impersonation grant script"
+  ansible.windows.win_shell: "sqlcmd -S localhost -E -i C:\\Windows\\Temp\\impersonate_{{ item.grantor }}_{{ item.grantee }}.sql"
+  loop: "{{ ludus_mssql_impersonations }}"
+  when: ludus_mssql_impersonations | length > 0
+  no_log: false
+
+- name: "Remove impersonation grant script"
+  ansible.windows.win_file:
+    path: "C:\\Windows\\Temp\\impersonate_{{ item.grantor }}_{{ item.grantee }}.sql"
+    state: absent
+  loop: "{{ ludus_mssql_impersonations }}"
+  when: ludus_mssql_impersonations | length > 0
