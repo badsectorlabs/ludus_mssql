@@ -1,0 +1,17 @@
+---
+- name: Write xp_cmdshell enable script
+  ansible.windows.win_copy:
+    content: |
+      EXEC sp_configure 'show advanced options', 1;
+      RECONFIGURE;
+      EXEC sp_configure 'xp_cmdshell', 1;
+      RECONFIGURE;
+    dest: "C:\\Windows\\Temp\\enable_xp_cmdshell.sql"
+
+- name: Execute xp_cmdshell enable script
+  ansible.windows.win_shell: "sqlcmd -S localhost -E -i C:\\Windows\\Temp\\enable_xp_cmdshell.sql"
+
+- name: Remove xp_cmdshell enable script
+  ansible.windows.win_file:
+    path: "C:\\Windows\\Temp\\enable_xp_cmdshell.sql"
+    state: absent
