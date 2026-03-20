@@ -1,0 +1,33 @@
+---
+- name: "Write AD login creation script"
+  ansible.windows.win_copy:
+    content: |
+      IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'{{ item.username }}')
+      BEGIN
+        CREATE LOGIN [{{ item.username }}] FROM WINDOWS
+          WITH DEFAULT_DATABASE = [master];
+      END
+      {% if item.sysadmin | default(false) %}
+      IF IS_SRVROLEMEMBER('sysadmin', '{{ item.username }}') = 0
+        ALTER SERVER ROLE sysadmin ADD MEMBER [{{ item.username }}];
+      {% else %}
+      IF IS_SRVROLEMEMBER('sysadmin', '{{ item.username }}') = 1
+        ALTER SERVER ROLE sysadmin DROP MEMBER [{{ item.username }}];
+      {% endif %}
+    dest: "C:\\Windows\\Temp\\create_ad_login_{{ item.username | regex_replace('[\\\\/@]', '_') }}.sql"
+  loop: "{{ ludus_mssql_ad_logins }}"
+  when: ludus_mssql_ad_logins | length > 0
+  no_log: false
+
+- name: "Execute AD login creation script"
+  ansible.windows.win_shell: "sqlcmd -S localhost -E -i C:\\Windows\\Temp\\create_ad_login_{{ item.username | regex_replace('[\\\\/@]', '_') }}.sql"
+  loop: "{{ ludus_mssql_ad_logins }}"
+  when: ludus_mssql_ad_logins | length > 0
+  no_log: false
+
+- name: "Remove AD login creation script"
+  ansible.windows.win_file:
+    path: "C:\\Windows\\Temp\\create_ad_login_{{ item.username | regex_replace('[\\\\/@]', '_') }}.sql"
+    state: absent
+  loop: "{{ ludus_mssql_ad_logins }}"
+  when: ludus_mssql_ad_logins | length > 0
