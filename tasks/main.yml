@@ -10,6 +10,14 @@
     file: install-mssql.yml
   when: (not install_check.exists) or (install_check.exists and ludus_mssql_instance_name not in install_check.value)
 
+- name: Enable TCP and firewall for MSSQL
+  ansible.builtin.include_tasks: enable_tcp.yml
+  when: ludus_mssql_enable_tcp | bool
+
+- name: Configure linked servers
+  ansible.builtin.include_tasks: create_linked_server.yml
+  when: ludus_mssql_linked_servers | length > 0
+
 - name: Check if SSMS is already installed
   ansible.windows.win_reg_stat:
     path: 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\160\Tools\ClientSetup'
