@@ -33,4 +33,4 @@
 - name: Restart SQL Server service to apply TCP changes
   ansible.windows.win_service:
     name: MSSQLSERVER
-    state: restarteds
+    state: restarted
