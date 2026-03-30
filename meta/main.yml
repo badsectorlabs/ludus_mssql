@@ -4,17 +4,22 @@ dependencies: []
 galaxy_info:
   role_name: ludus_mssql
   author: badsectorlabs
-  description: Install MSSQL on Window systems
+  description: >
+    Install and configure MSSQL Server on Windows systems with full attack path
+    support — SA account, sysadmins, impersonation, linked servers, TCP/IP control.
   company: Bad Sector Labs
   license: GPLv3
-  min_ansible_version: "2.10"
+  version: "0.8.0"
+  min_ansible_version: "2.14"
   platforms:
     - name: Windows
       versions:
-        - "2012R2"
         - "2016"
         - "2019"
         - "2022"
-
   galaxy_tags:
-    - MSSQL
+    - mssql
+    - windows
+    - ludus
+    - security_lab
+    - active_directory

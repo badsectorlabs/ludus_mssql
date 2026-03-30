@@ -14,8 +14,61 @@
     src: "sqlsrv_{{ ludus_mssql_version }}_config.ini.j2"
     dest: "{{ ludus_mssql_sql_config_path }}"
 
-- name: Install MSSQL SQL - This will take a while
-  ansible.windows.win_shell: "{{ iso_mount.mount_paths[0] }}setup.exe /ConfigurationFile={{ ludus_mssql_sql_config_path }}"
+# SQL Server setup.exe fails with DPAPI CryptographicException when run directly
+# over WinRM because WinRM sessions lack the DPAPI user context. The fix is to
+# run setup.exe via a scheduled task which executes in a full SYSTEM session.
+- name: Install MSSQL SQL via scheduled task - This will take a while
+  ansible.windows.win_powershell:
+    script: |
+      $setupPath = "{{ iso_mount.mount_paths[0] }}setup.exe"
+      $configPath = "{{ ludus_mssql_sql_config_path }}"
+      $logFile = "{{ ludus_mssql_iso_directory }}\mssql_install.log"
+      $taskName = "LudusMSSQLInstall"
+
+      # Clean up any previous task
+      Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+
+      # Create the action: run setup.exe with the config file, log output
+      $action = New-ScheduledTaskAction -Execute $setupPath -Argument "/ConfigurationFile=$configPath"
+      $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+      $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Hours 2)
+
+      Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Settings $settings -Force | Out-Null
+
+      # Start the task
+      Start-ScheduledTask -TaskName $taskName
+
+      # Poll until complete (check every 30 seconds, timeout after 90 minutes)
+      $timeout = (Get-Date).AddMinutes(90)
+      do {
+          Start-Sleep -Seconds 30
+          $task = Get-ScheduledTask -TaskName $taskName
+          $info = Get-ScheduledTaskInfo -TaskName $taskName
+      } while ($task.State -eq 'Running' -and (Get-Date) -lt $timeout)
+
+      $exitCode = $info.LastTaskResult
+
+      # Clean up the scheduled task
+      Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+
+      # Check results
+      if ($task.State -eq 'Running') {
+          $Ansible.Failed = $true
+          $Ansible.Result = "MSSQL install timed out after 90 minutes"
+      } elseif ($exitCode -ne 0 -and $exitCode -ne 3010) {
+          # 3010 = success but reboot required
+          $Ansible.Failed = $true
+          $Ansible.Result = "MSSQL setup.exe exited with code: $exitCode"
+          # Try to get summary log for debugging
+          $summaryLog = Get-ChildItem "C:\Program Files\Microsoft SQL Server\*\Setup Bootstrap\Log\Summary.txt" -ErrorAction SilentlyContinue | Select-Object -Last 1
+          if ($summaryLog) {
+              $Ansible.Result += "`nSummary log: $(Get-Content $summaryLog.FullName -Raw -ErrorAction SilentlyContinue)"
+          }
+      } else {
+          $Ansible.Changed = $true
+          $Ansible.Result = "MSSQL installed successfully (exit code: $exitCode)"
+      }
+  timeout: 5400
 
 - name: Unmount ISO
   community.windows.win_disk_image:

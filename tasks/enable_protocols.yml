@@ -30,6 +30,17 @@
     state: present
     enabled: true
 
+- name: Open Windows Firewall for MSSQL UDP 1434 (SQL Browser discovery)
+  community.windows.win_firewall_rule:
+    name: "MSSQL UDP 1434"
+    localport: 1434
+    action: allow
+    direction: in
+    protocol: udp
+    state: present
+    enabled: true
+  when: ludus_mssql_enable_udp_discovery | default(true) | bool
+
 - name: Restart SQL Server service to apply TCP changes
   ansible.windows.win_service:
     name: MSSQLSERVER

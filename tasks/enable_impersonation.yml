@@ -1,4 +1,7 @@
 ---
+# Grant login-level impersonation: EXECUTE AS LOGIN
+# Filenames use regex_replace to sanitize DOMAIN\user backslashes in dest paths
+
 - name: "Write impersonation grant script"
   ansible.windows.win_copy:
     content: |
@@ -7,20 +10,20 @@
       BEGIN
         GRANT IMPERSONATE ON LOGIN::[{{ item.grantor }}] TO [{{ item.grantee }}];
       END
-    dest: "C:\\Windows\\Temp\\impersonate_{{ item.grantor }}_{{ item.grantee }}.sql"
+    dest: "C:\\Windows\\Temp\\impersonate_{{ item.grantor | regex_replace('[\\\\/@\\s]', '_') }}_{{ item.grantee | regex_replace('[\\\\/@\\s]', '_') }}.sql"
   loop: "{{ ludus_mssql_impersonations }}"
   when: ludus_mssql_impersonations | length > 0
   no_log: false
 
 - name: "Execute impersonation grant script"
-  ansible.windows.win_shell: "sqlcmd -S localhost -E -i C:\\Windows\\Temp\\impersonate_{{ item.grantor }}_{{ item.grantee }}.sql"
+  ansible.windows.win_shell: "sqlcmd -S localhost -E -i \"C:\\Windows\\Temp\\impersonate_{{ item.grantor | regex_replace('[\\\\/@\\s]', '_') }}_{{ item.grantee | regex_replace('[\\\\/@\\s]', '_') }}.sql\" -C"
   loop: "{{ ludus_mssql_impersonations }}"
   when: ludus_mssql_impersonations | length > 0
   no_log: false
 
 - name: "Remove impersonation grant script"
   ansible.windows.win_file:
-    path: "C:\\Windows\\Temp\\impersonate_{{ item.grantor }}_{{ item.grantee }}.sql"
+    path: "C:\\Windows\\Temp\\impersonate_{{ item.grantor | regex_replace('[\\\\/@\\s]', '_') }}_{{ item.grantee | regex_replace('[\\\\/@\\s]', '_') }}.sql"
     state: absent
   loop: "{{ ludus_mssql_impersonations }}"
   when: ludus_mssql_impersonations | length > 0

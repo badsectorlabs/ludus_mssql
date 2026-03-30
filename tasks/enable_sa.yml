@@ -1,0 +1,22 @@
+---
+# enable_sa.yml — Enable SA account and set password
+#
+# Required for GOAD attack paths where impersonation chains target SA.
+# Only runs when ludus_mssql_enable_sa: true or ludus_mssql_sa_password is set.
+
+- name: Write SA enable script
+  ansible.windows.win_copy:
+    content: |
+      ALTER LOGIN sa ENABLE;
+      ALTER LOGIN sa WITH PASSWORD = N'{{ ludus_mssql_sa_password }}', CHECK_POLICY = OFF;
+    dest: "C:\\Windows\\Temp\\enable_sa.sql"
+  no_log: true
+
+- name: Execute SA enable script
+  ansible.windows.win_shell: "sqlcmd -S localhost -E -i C:\\Windows\\Temp\\enable_sa.sql"
+  no_log: false
+
+- name: Remove SA enable script
+  ansible.windows.win_file:
+    path: "C:\\Windows\\Temp\\enable_sa.sql"
+    state: absent

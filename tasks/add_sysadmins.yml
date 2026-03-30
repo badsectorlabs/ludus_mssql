@@ -1,0 +1,38 @@
+---
+# add_sysadmins.yml — Add Windows accounts as sysadmins
+#
+# Simple shorthand for adding domain accounts to the sysadmin role.
+# Creates the Windows login if it doesn't exist, then adds to sysadmin.
+#
+# Variable format:
+#   ludus_mssql_sysadmins:
+#     - "DOMAIN\\sql_svc"
+#     - "DOMAIN\\jon.snow"
+
+- name: "Write sysadmin grant script"
+  ansible.windows.win_copy:
+    content: |
+      -- Create Windows login if it doesn't exist
+      IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'{{ item }}')
+        CREATE LOGIN [{{ item }}] FROM WINDOWS WITH DEFAULT_DATABASE = [master];
+
+      -- Add to sysadmin role if not already a member
+      IF IS_SRVROLEMEMBER('sysadmin', '{{ item }}') = 0
+        ALTER SERVER ROLE sysadmin ADD MEMBER [{{ item }}];
+    dest: "C:\\Windows\\Temp\\add_sysadmin_{{ item | regex_replace('[\\\\/@\\s]', '_') }}.sql"
+  loop: "{{ ludus_mssql_sysadmins }}"
+  when: ludus_mssql_sysadmins | length > 0
+  no_log: false
+
+- name: "Execute sysadmin grant script"
+  ansible.windows.win_shell: "sqlcmd -S localhost -E -i C:\\Windows\\Temp\\add_sysadmin_{{ item | regex_replace('[\\\\/@\\s]', '_') }}.sql"
+  loop: "{{ ludus_mssql_sysadmins }}"
+  when: ludus_mssql_sysadmins | length > 0
+  no_log: false
+
+- name: "Remove sysadmin grant script"
+  ansible.windows.win_file:
+    path: "C:\\Windows\\Temp\\add_sysadmin_{{ item | regex_replace('[\\\\/@\\s]', '_') }}.sql"
+    state: absent
+  loop: "{{ ludus_mssql_sysadmins }}"
+  when: ludus_mssql_sysadmins | length > 0
