@@ -1,4 +1,9 @@
 ---
+# =============================================================================
+# ludus_mssql — MSSQL Server installation and attack path configuration
+# =============================================================================
+
+# General installation settings
 ludus_install_directory: /opt/ludus
 ludus_mssql_iso_directory: "C:\\ludus"
 ludus_mssql_version: "2019"
@@ -11,11 +16,88 @@ ludus_mssql_ssms_url: "https://aka.ms/ssmsfullsetup"
 ludus_mssql_install_ssms: true
 ludus_mssql_enable_tcp: false
 ludus_mssql_mixed_mode_auth: true
-ludus_mssql_linked_servers: []
-ludus_mssql_sql_users: []
-ludus_mssql_ad_logins: []
-ludus_mssql_impersonations: []
 ludus_mssql_enable_xp_cmdshell: false
+
+# Service account for SQL Server service (templated into config INI)
+# Use "NT Authority\\Network Service" for local account (default)
+# Use "DOMAIN\\username" for a domain service account
+ludus_mssql_svc_account: "NT Authority\\Network Service"
+
+# .NET machine.config corruption fix (safe no-op on clean systems)
+# Set to true to validate/repair .NET config before SQL install.
+# Prevents IIS/ADCS installations from breaking SQL Server installer.
+ludus_mssql_fix_dotnet_config: true
+
+# UDP 1434 SQL Browser discovery firewall rule (only applies when enable_tcp is true)
+ludus_mssql_enable_udp_discovery: true
+
+# =============================================================================
+# SA Account (disabled by default)
+# =============================================================================
+# Enable and set the SA account password. Required for GOAD impersonation chains.
+ludus_mssql_enable_sa: false
+ludus_mssql_sa_password: ""
+
+# =============================================================================
+# User and login management
+# =============================================================================
+
+# SQL logins to create (requires ludus_mssql_mixed_mode_auth: true)
+ludus_mssql_sql_users: []
+# Example:
+# ludus_mssql_sql_users:
+#   - username: "sqladmin"
+#     password: "Password123!"
+#     sysadmin: true
+
+# Active Directory Windows logins to create
+ludus_mssql_ad_logins: []
+# Example:
+# ludus_mssql_ad_logins:
+#   - username: "DOMAIN\\user"
+#     sysadmin: true
+
+# Shorthand: add Windows accounts directly as sysadmins (creates login + adds to role)
+ludus_mssql_sysadmins: []
+# Example:
+# ludus_mssql_sysadmins:
+#   - "DOMAIN\\sql_svc"
+#   - "DOMAIN\\jon.snow"
+
+# =============================================================================
+# Impersonation (attack paths)
+# =============================================================================
+
+# Login-level impersonation (EXECUTE AS LOGIN — server scope)
+ludus_mssql_impersonations: []
+# Example:
+# ludus_mssql_impersonations:
+#   - grantor: "sa"
+#     grantee: "DOMAIN\\samwell.tarly"
+
+# Database-level impersonation (EXECUTE AS USER — database scope)
+# Creates login → DB user → grants IMPERSONATE ON USER
+ludus_mssql_impersonation_users: []
+# Example (GOAD: arya.stark can impersonate dbo in msdb):
+# ludus_mssql_impersonation_users:
+#   - login: "DOMAIN\\arya.stark"
+#     database: "msdb"
+#     impersonate_user: "dbo"
+
+# =============================================================================
+# Linked servers (cross-domain/forest attacks)
+# =============================================================================
+ludus_mssql_linked_servers: []
+# Example:
+# ludus_mssql_linked_servers:
+#   - name: "BRAAVOS"
+#     data_source: "braavos.essos.local"
+#     remote_user: "sa"
+#     remote_password: "Admin123!"
+
+# =============================================================================
+# Internal: version-to-registry mapping (do not override)
+# =============================================================================
 ludus_mssql_version_map:
   "2019": "15"
   "2022": "16"

@@ -1,0 +1,39 @@
+---
+# fix_dotnet_config.yml — Fix .NET machine.config XML corruption
+#
+# IIS and ADCS installations can corrupt the .NET machine.config files by
+# adding entries that break XML validation. If SQL Server is installed after
+# IIS/ADCS, the corrupted config causes the SQL installer's XML generation
+# to fail silently, leading to install failures.
+#
+# This task validates the XML and only repairs if corruption is detected.
+# It's safe to run on clean systems — it will be a no-op.
+
+- name: Check and fix .NET machine.config XML corruption
+  ansible.windows.win_powershell:
+    script: |
+      $fixed = $false
+      $configs = @(
+        "$env:SystemRoot\Microsoft.NET\Framework64\v4.0.30319\Config\machine.config",
+        "$env:SystemRoot\Microsoft.NET\Framework\v4.0.30319\Config\machine.config"
+      )
+      foreach ($configPath in $configs) {
+        if (Test-Path $configPath) {
+          try {
+            [xml]$xml = Get-Content $configPath -Raw
+            Write-Output "$configPath - XML is valid"
+          } catch {
+            Write-Output "$configPath - CORRUPT XML detected, backing up and repairing"
+            Copy-Item $configPath "$configPath.bak.$(Get-Date -Format 'yyyyMMddHHmmss')" -Force
+            # Re-register ASP.NET to regenerate a clean machine.config
+            $regiis = "$env:SystemRoot\Microsoft.NET\Framework64\v4.0.30319\aspnet_regiis.exe"
+            if (Test-Path $regiis) {
+              & $regiis -i 2>&1 | Out-Null
+            }
+            $fixed = $true
+          }
+        }
+      }
+      $Ansible.Changed = $fixed
+  changed_when: false
+  ignore_errors: true

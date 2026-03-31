@@ -43,11 +43,11 @@ QUIETSIMPLE="False"
 
 ; Specify whether SQL Server Setup should discover and include product updates. The valid values are True and False or 1 and 0. By default SQL Server Setup will include updates that are found. 
 
-UpdateEnabled="True"
+UpdateEnabled="False"
 
 ; If this parameter is provided, then this computer will use Microsoft Update to check for updates. 
 
-USEMICROSOFTUPDATE="True"
+USEMICROSOFTUPDATE="False"
 
 ; Specifies that SQL Server Setup should not display the paid edition notice when ran from the command line. 
 
@@ -149,7 +149,7 @@ SQLCOLLATION="SQL_Latin1_General_CP1_CI_AS"
 
 ; Account for SQL Server service: Domain\User or system account. 
 
-SQLSVCACCOUNT="NT Authority\Network Service"
+SQLSVCACCOUNT="{{ ludus_mssql_svc_account | default('NT Authority\\Network Service') }}"
 ; SQLSVCPASSWORD=""
 
 ; Set to "True" to enable instant file initialization for SQL Server service. If enabled, Setup will grant Perform Volume Maintenance Task privilege to the Database Engine Service SID. This may lead to information disclosure as it could allow deleted content to be accessed by an unauthorized principal. 
@@ -186,7 +186,7 @@ ADDCURRENTUSERASSQLADMIN="False"
 
 ; Specify 0 to disable or 1 to enable the TCP/IP protocol. 
 
-TCPENABLED="1"
+TCPENABLED="{{ '1' if ludus_mssql_enable_tcp else '0' }}"
 
 ; Specify 0 to disable or 1 to enable the Named Pipes protocol. 
 

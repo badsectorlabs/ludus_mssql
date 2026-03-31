@@ -1,0 +1,46 @@
+---
+# create_impersonation_users.yml — Database-level EXECUTE AS USER impersonation
+#
+# Grants a Windows login the ability to impersonate a database user within a
+# specific database. This is separate from login-level impersonation
+# (enable_impersonation.yml) which operates at the server level.
+#
+# GOAD example: NORTH\arya.stark can impersonate dbo in msdb
+#
+# Variable format:
+#   ludus_mssql_impersonation_users:
+#     - login: "DOMAIN\\username"
+#       database: "msdb"
+#       impersonate_user: "dbo"
+
+- name: "Write database-level impersonation script"
+  ansible.windows.win_copy:
+    content: |
+      -- Create Windows login if it doesn't exist
+      IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'{{ item.login }}')
+        CREATE LOGIN [{{ item.login }}] FROM WINDOWS WITH DEFAULT_DATABASE = [master];
+
+      -- Create database user for the login
+      USE [{{ item.database }}];
+      IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = N'{{ item.login }}')
+        CREATE USER [{{ item.login }}] FOR LOGIN [{{ item.login }}];
+
+      -- Grant impersonation on the target user
+      GRANT IMPERSONATE ON USER::[{{ item.impersonate_user }}] TO [{{ item.login }}];
+    dest: "C:\\Windows\\Temp\\impersonate_user_{{ item.login | regex_replace('[\\\\/@\\s]', '_') }}.sql"
+  loop: "{{ ludus_mssql_impersonation_users }}"
+  when: ludus_mssql_impersonation_users | length > 0
+  no_log: false
+
+- name: "Execute database-level impersonation script"
+  ansible.windows.win_shell: "sqlcmd -S localhost -E -i C:\\Windows\\Temp\\impersonate_user_{{ item.login | regex_replace('[\\\\/@\\s]', '_') }}.sql"
+  loop: "{{ ludus_mssql_impersonation_users }}"
+  when: ludus_mssql_impersonation_users | length > 0
+  no_log: false
+
+- name: "Remove database-level impersonation script"
+  ansible.windows.win_file:
+    path: "C:\\Windows\\Temp\\impersonate_user_{{ item.login | regex_replace('[\\\\/@\\s]', '_') }}.sql"
+    state: absent
+  loop: "{{ ludus_mssql_impersonation_users }}"
+  when: ludus_mssql_impersonation_users | length > 0

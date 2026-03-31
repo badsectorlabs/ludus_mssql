@@ -1,4 +1,9 @@
 ---
+# Fix .NET machine.config before install (prevents IIS/ADCS corruption breaking SQL)
+- name: Fix .NET machine.config corruption
+  ansible.builtin.include_tasks: fix_dotnet_config.yml
+  when: ludus_mssql_fix_dotnet_config | default(true) | bool
+
 - name: Check for existing install
   ansible.windows.win_reg_stat:
     path: 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server'
@@ -26,8 +31,16 @@
   ansible.builtin.include_tasks: enable_impersonation.yml
   when: ludus_mssql_impersonations | default([]) | length > 0
 
+- name: Configure database-level impersonation users
+  ansible.builtin.include_tasks: create_impersonation_users.yml
+  when: ludus_mssql_impersonation_users | default([]) | length > 0
+
+- name: Add sysadmin members
+  ansible.builtin.include_tasks: add_sysadmins.yml
+  when: ludus_mssql_sysadmins | default([]) | length > 0
+
 - name: Enable TCP and firewall for MSSQL
-  ansible.builtin.include_tasks: enable_tcp.yml
+  ansible.builtin.include_tasks: enable_protocols.yml
   when: ludus_mssql_enable_tcp | default(true) | bool
 
 - name: Configure linked servers
@@ -37,6 +50,10 @@
 - name: Enable xp_cmdshell
   ansible.builtin.include_tasks: enable_xp_cmdshell.yml
   when: ludus_mssql_enable_xp_cmdshell | default(false) | bool
+
+- name: Enable SA account
+  ansible.builtin.include_tasks: enable_sa.yml
+  when: (ludus_mssql_enable_sa | default(false) | bool) or (ludus_mssql_sa_password | default('') | length > 0)
 
 - name: Check if SSMS is already installed
   ansible.windows.win_reg_stat:
