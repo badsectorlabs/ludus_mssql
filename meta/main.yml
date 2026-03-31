@@ -9,7 +9,6 @@ galaxy_info:
     support — SA account, sysadmins, impersonation, linked servers, TCP/IP control.
   company: Bad Sector Labs
   license: GPLv3
-  version: "1.2.1"
   min_ansible_version: "2.14"
   platforms:
     - name: Windows
