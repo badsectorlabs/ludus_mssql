@@ -1,0 +1,7 @@
+---
+- name: Restart SQL Server service
+  ansible.windows.win_powershell:
+    script: |
+      Restart-Service -Name "MSSQLSERVER" -Force
+      $Ansible.Changed = $true
+  listen: restart mssql

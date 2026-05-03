@@ -25,9 +25,10 @@
   no_log: false
 
 - name: "Execute sysadmin grant script"
-  ansible.windows.win_shell: "sqlcmd -S localhost -E -i C:\\Windows\\Temp\\add_sysadmin_{{ item | regex_replace('[\\\\/@\\s]', '_') }}.sql"
+  ansible.windows.win_shell: "sqlcmd -S localhost -E -C -i C:\\Windows\\Temp\\add_sysadmin_{{ item | regex_replace('[\\\\/@\\s]', '_') }}.sql"
   loop: "{{ ludus_mssql_sysadmins }}"
   when: ludus_mssql_sysadmins | length > 0
+  changed_when: false
   no_log: false
 
 - name: "Remove sysadmin grant script"

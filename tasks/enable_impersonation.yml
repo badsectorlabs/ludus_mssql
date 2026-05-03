@@ -19,6 +19,7 @@
   ansible.windows.win_shell: "sqlcmd -S localhost -E -i \"C:\\Windows\\Temp\\impersonate_{{ item.grantor | regex_replace('[\\\\/@\\s]', '_') }}_{{ item.grantee | regex_replace('[\\\\/@\\s]', '_') }}.sql\" -C"
   loop: "{{ ludus_mssql_impersonations }}"
   when: ludus_mssql_impersonations | length > 0
+  changed_when: false
   no_log: false
 
 - name: "Remove impersonation grant script"

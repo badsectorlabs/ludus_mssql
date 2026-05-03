@@ -20,9 +20,10 @@
   no_log: false
 
 - name: "Execute AD login creation script"
-  ansible.windows.win_shell: "sqlcmd -S localhost -E -i C:\\Windows\\Temp\\create_ad_login_{{ item.username | regex_replace('[\\\\/@]', '_') }}.sql"
+  ansible.windows.win_shell: "sqlcmd -S localhost -E -C -i C:\\Windows\\Temp\\create_ad_login_{{ item.username | regex_replace('[\\\\/@]', '_') }}.sql"
   loop: "{{ ludus_mssql_ad_logins }}"
   when: ludus_mssql_ad_logins | length > 0
+  changed_when: false
   no_log: false
 
 - name: "Remove AD login creation script"

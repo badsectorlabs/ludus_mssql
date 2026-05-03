@@ -5,8 +5,4 @@
     name: LoginMode
     data: 2
     type: dword
-
-- name: Restart SQL Server service to apply mixed mode auth
-  ansible.windows.win_service:
-    name: "{{ ludus_mssql_instance_name }}"
-    state: restarted
+  notify: restart mssql

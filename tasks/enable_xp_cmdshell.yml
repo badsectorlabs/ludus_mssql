@@ -10,6 +10,7 @@
 
 - name: Execute xp_cmdshell enable script
   ansible.windows.win_shell: "sqlcmd -S localhost -E -i C:\\Windows\\Temp\\enable_xp_cmdshell.sql"
+  changed_when: false
 
 - name: Remove xp_cmdshell enable script
   ansible.windows.win_file:

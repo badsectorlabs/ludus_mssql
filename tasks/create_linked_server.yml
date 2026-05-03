@@ -1,14 +1,38 @@
 ---
 - name: "Create linked server"
-  ansible.windows.win_shell: >-
-    sqlcmd -S localhost -E -Q
-    "IF EXISTS (SELECT 1 FROM sys.servers WHERE name = N'{{ item.name }}' AND is_linked = 1)
-    EXEC sp_dropserver '{{ item.name }}', 'droplogins';
-    EXEC master.dbo.sp_addlinkedserver @server = N'{{ item.name }}', @srvproduct = N'', @provider = N'{{ item.provider | default('MSOLEDBSQL') }}', @datasrc = N'{{ item.data_source }}';
-    EXEC master.dbo.sp_addlinkedsrvlogin @rmtsrvname = N'{{ item.name }}', @useself = 'False', @locallogin = NULL, @rmtuser = N'{{ item.remote_user }}', @rmtpassword = N'{{ item.remote_password }}';
-    EXEC master.dbo.sp_serveroption @server = N'{{ item.name }}', @optname = 'rpc out', @optvalue = 'true';
-    EXEC master.dbo.sp_serveroption @server = N'{{ item.name }}', @optname = 'data access', @optvalue = 'true';
-    SELECT name, data_source, provider FROM sys.servers WHERE is_linked = 1;"
+  ansible.windows.win_powershell:
+    script: |
+      param(
+        [String]$ServerName,
+        [String]$DataSource,
+        [String]$Provider,
+        [String]$RemoteUser,
+        [String]$RemotePassword
+      )
+      # Check if linked server exists with correct data source
+      $existing = Get-Item "SQLSERVER:\SQL\localhost\DEFAULT\LinkedServers\$ServerName" -ErrorAction SilentlyContinue
+      if ($existing) {
+        $currentDs = $existing.DataSource
+        if ($currentDs -eq $DataSource) {
+          Write-Output "Linked server '$ServerName' already exists with correct data source. Skipping."
+          $Ansible.Changed = $false
+          return
+        }
+        # Exists but wrong config — drop and recreate
+        Invoke-Sqlcmd -Query "EXEC sp_dropserver '$ServerName', 'droplogins';" -ErrorAction Stop
+      }
+      Invoke-Sqlcmd -Query "EXEC master.dbo.sp_addlinkedserver @server = N'$ServerName', @srvproduct = N'', @provider = N'$Provider', @datasrc = N'$DataSource';" -ErrorAction Stop
+      Invoke-Sqlcmd -Query "EXEC master.dbo.sp_addlinkedsrvlogin @rmtsrvname = N'$ServerName', @useself = 'False', @locallogin = NULL, @rmtuser = N'$RemoteUser', @rmtpassword = N'$RemotePassword';" -ErrorAction Stop
+      Invoke-Sqlcmd -Query "EXEC master.dbo.sp_serveroption @server = N'$ServerName', @optname = 'rpc out', @optvalue = 'true';" -ErrorAction Stop
+      Invoke-Sqlcmd -Query "EXEC master.dbo.sp_serveroption @server = N'$ServerName', @optname = 'data access', @optvalue = 'true';" -ErrorAction Stop
+      Write-Output "Linked server '$ServerName' created."
+      $Ansible.Changed = $true
+    parameters:
+      ServerName: "{{ item.name }}"
+      DataSource: "{{ item.data_source }}"
+      Provider: "{{ item.provider | default('MSOLEDBSQL') }}"
+      RemoteUser: "{{ item.remote_user }}"
+      RemotePassword: "{{ item.remote_password }}"
   loop: "{{ ludus_mssql_linked_servers }}"
   when: ludus_mssql_linked_servers | length > 0
-  no_log: false
+  no_log: true

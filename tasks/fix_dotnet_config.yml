@@ -35,5 +35,4 @@
         }
       }
       $Ansible.Changed = $fixed
-  changed_when: false
   ignore_errors: true
