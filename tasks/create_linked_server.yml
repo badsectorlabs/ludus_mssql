@@ -7,32 +7,79 @@
         [String]$DataSource,
         [String]$Provider,
         [String]$RemoteUser,
-        [String]$RemotePassword
+        [String]$RemotePassword,
+        [String]$UserMappingsJson
       )
       # Check if linked server exists with correct data source
-      $existing = Get-Item "SQLSERVER:\SQL\localhost\DEFAULT\LinkedServers\$ServerName" -ErrorAction SilentlyContinue
-      if ($existing) {
-        $currentDs = $existing.DataSource
-        if ($currentDs -eq $DataSource) {
-          Write-Output "Linked server '$ServerName' already exists with correct data source. Skipping."
+      $checkSql = "SELECT data_source FROM sys.servers WHERE name = N'$ServerName' AND is_linked = 1"
+      $existing = sqlcmd -S localhost -E -C -Q $checkSql -h-1 2>&1 |
+        Where-Object { $_.Trim() -ne "" -and $_ -notmatch "rows affected" }
+
+      # Parse user mappings if provided
+      $userMappings = $null
+      if ($UserMappingsJson -and $UserMappingsJson -ne '[]') {
+        $userMappings = $UserMappingsJson | ConvertFrom-Json
+      }
+
+      if ($existing -and $existing.Trim() -eq $DataSource) {
+        # Server exists — check if login mappings are correct
+        $needsUpdate = $false
+        if ($userMappings -and $userMappings.Count -gt 0) {
+          foreach ($mapping in $userMappings) {
+            $localLogin = $mapping.local_login
+            $checkLogin = "SELECT COUNT(*) FROM sys.linked_logins ll JOIN sys.server_principals sp ON ll.local_principal_id = sp.principal_id WHERE ll.server_id = (SELECT server_id FROM sys.servers WHERE name = N'$ServerName') AND sp.name = N'$localLogin'"
+            $checkResult = sqlcmd -S localhost -E -C -Q $checkLogin -h-1 2>&1 |
+              Where-Object { $_.Trim() -match '^\s*\d+\s*$' } | Select-Object -First 1
+            $loginExists = $checkResult -and [int]$checkResult.Trim() -gt 0
+            if (-not $loginExists) {
+              $needsUpdate = $true
+              break
+            }
+          }
+        }
+        if (-not $needsUpdate) {
+          Write-Output "Linked server '$ServerName' already exists with correct configuration. Skipping."
           $Ansible.Changed = $false
           return
         }
-        # Exists but wrong config — drop and recreate
-        Invoke-Sqlcmd -Query "EXEC sp_dropserver '$ServerName', 'droplogins';" -ErrorAction Stop
+        # Mappings differ — drop and recreate
+        sqlcmd -S localhost -E -C -Q "EXEC sp_dropserver '$ServerName', 'droplogins';" 2>&1 | Out-Null
+        Write-Output "Dropping '$ServerName' to update login mappings."
+      } elseif ($existing) {
+        sqlcmd -S localhost -E -C -Q "EXEC sp_dropserver '$ServerName', 'droplogins';" 2>&1 | Out-Null
       }
-      Invoke-Sqlcmd -Query "EXEC master.dbo.sp_addlinkedserver @server = N'$ServerName', @srvproduct = N'', @provider = N'$Provider', @datasrc = N'$DataSource';" -ErrorAction Stop
-      Invoke-Sqlcmd -Query "EXEC master.dbo.sp_addlinkedsrvlogin @rmtsrvname = N'$ServerName', @useself = 'False', @locallogin = NULL, @rmtuser = N'$RemoteUser', @rmtpassword = N'$RemotePassword';" -ErrorAction Stop
-      Invoke-Sqlcmd -Query "EXEC master.dbo.sp_serveroption @server = N'$ServerName', @optname = 'rpc out', @optvalue = 'true';" -ErrorAction Stop
-      Invoke-Sqlcmd -Query "EXEC master.dbo.sp_serveroption @server = N'$ServerName', @optname = 'data access', @optvalue = 'true';" -ErrorAction Stop
+
+      # Create the linked server
+      sqlcmd -S localhost -E -C -Q "EXEC master.dbo.sp_addlinkedserver @server = N'$ServerName', @srvproduct = N'', @provider = N'$Provider', @datasrc = N'$DataSource';" 2>&1 | Out-Null
+      if ($LASTEXITCODE -ne 0) { throw "sp_addlinkedserver failed for '$ServerName'" }
+
+      if ($userMappings -and $userMappings.Count -gt 0) {
+        # Per-local-login mappings — only specific accounts get remote access
+        foreach ($mapping in $userMappings) {
+          $localLogin = $mapping.local_login
+          $remoteUser = $mapping.remote_user
+          $remotePass = $mapping.remote_password
+          sqlcmd -S localhost -E -C -Q "EXEC master.dbo.sp_addlinkedsrvlogin @rmtsrvname = N'$ServerName', @useself = 'False', @locallogin = N'$localLogin', @rmtuser = N'$remoteUser', @rmtpassword = N'$remotePass';" 2>&1 | Out-Null
+          Write-Output "  Mapped local login '$localLogin' -> remote '$remoteUser'"
+        }
+        # All other local logins use self (no access to linked server)
+        sqlcmd -S localhost -E -C -Q "EXEC master.dbo.sp_addlinkedsrvlogin @rmtsrvname = N'$ServerName', @useself = 'True', @locallogin = NULL;" 2>&1 | Out-Null
+      } else {
+        # Catch-all mapping — all local logins map to the same remote credentials
+        sqlcmd -S localhost -E -C -Q "EXEC master.dbo.sp_addlinkedsrvlogin @rmtsrvname = N'$ServerName', @useself = 'False', @locallogin = NULL, @rmtuser = N'$RemoteUser', @rmtpassword = N'$RemotePassword';" 2>&1 | Out-Null
+      }
+
+      sqlcmd -S localhost -E -C -Q "EXEC master.dbo.sp_serveroption @server = N'$ServerName', @optname = 'rpc out', @optvalue = 'true';" 2>&1 | Out-Null
+      sqlcmd -S localhost -E -C -Q "EXEC master.dbo.sp_serveroption @server = N'$ServerName', @optname = 'data access', @optvalue = 'true';" 2>&1 | Out-Null
       Write-Output "Linked server '$ServerName' created."
       $Ansible.Changed = $true
     parameters:
       ServerName: "{{ item.name }}"
       DataSource: "{{ item.data_source }}"
       Provider: "{{ item.provider | default('MSOLEDBSQL') }}"
-      RemoteUser: "{{ item.remote_user }}"
-      RemotePassword: "{{ item.remote_password }}"
+      RemoteUser: "{{ item.remote_user | default('') }}"
+      RemotePassword: "{{ item.remote_password | default('') }}"
+      UserMappingsJson: "{{ item.user_mappings | default([]) | to_json }}"
   loop: "{{ ludus_mssql_linked_servers }}"
   when: ludus_mssql_linked_servers | length > 0
   no_log: true

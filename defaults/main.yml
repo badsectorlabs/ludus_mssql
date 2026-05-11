@@ -88,12 +88,29 @@ ludus_mssql_impersonation_users: []
 # Linked servers (cross-domain/forest attacks)
 # =============================================================================
 ludus_mssql_linked_servers: []
-# Example:
+# Each linked server can have either:
+#   a) A single catch-all mapping (remote_user / remote_password) — all local logins
+#      map to the same remote credentials (@locallogin = NULL):
+#
 # ludus_mssql_linked_servers:
 #   - name: "BRAAVOS"
 #     data_source: "braavos.essos.local"
 #     remote_user: "sa"
-#     remote_password: "Admin123!"
+#     remote_password: "sa_P@ssw0rd!Ess0s"
+#
+#   b) Per-local-login mappings (user_mappings list) — only the specified local
+#      logins get remote access; all others are denied. This matches the GOAD
+#      design where only specific accounts (jon.snow, khal.drogo) can pivot via
+#      linked servers. Use this for realistic attack path configuration.
+#
+# ludus_mssql_linked_servers:
+#   - name: "BRAAVOS"
+#     data_source: "braavos.essos.local"
+#     user_mappings:
+#       - local_login: "NORTH\\jon.snow"
+#         remote_user: "sa"
+#         remote_password: "sa_P@ssw0rd!Ess0s"
+#     # No remote_user/remote_password = no catch-all; only jon.snow gets access
 
 # =============================================================================
 # Internal: version-to-registry mapping (do not override)
