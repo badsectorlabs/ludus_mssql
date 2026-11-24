@@ -10,9 +10,15 @@
   register: iso_mount
 
 - name: Copy config file
-  ansible.windows.win_template:
-    src: "sqlsrv_{{ ludus_mssql_version }}_config.ini.j2"
+  ansible.windows.win_copy:
+    content: >-
+      {{ lookup('ansible.builtin.template', 'sqlsrv_' ~ ludus_mssql_version ~ '_config.ini.j2')
+         | replace(lf, crlf) }}
     dest: "{{ ludus_mssql_sql_config_path }}"
+  vars:
+    lf: "\n"
+    crlf: "\r\n"
+  no_log: true  # The rendered INI may contain a SQL Server product key.
 
 # SQL Server setup.exe fails with DPAPI CryptographicException when run directly
 # over WinRM because WinRM sessions lack the DPAPI user context. The fix is to
