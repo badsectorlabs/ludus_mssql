@@ -12,6 +12,10 @@ Available variables are listed below, along with default values (see `defaults/m
 
 ### General Installation
 
+The role renders the SQL Setup INI on the Ansible controller before copying it to
+`ludus_mssql_sql_config_path` with Windows line endings. This avoids unrendered
+Jinja with `ansible-core` 2.19 and `ansible.windows` 2.7.0.
+
     ludus_install_directory: /opt/ludus
     ludus_mssql_iso_directory: "C:\\ludus"
     # Valid ludus_mssql_version options are "2019" or "2022"
